@@ -208,3 +208,7 @@ __marimo__/
 
 # Vscode config
 .vscode/
+
+# Claude files and configs
+.claude/
+CLAUDE.md
