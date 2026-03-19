@@ -12,21 +12,20 @@ class Renderer:
     BASE_HEIGHT = 700
     CELL_SIZE = 36
 
-    # Retro palette
-    BG_COLOR = (8, 8, 16)
-    GRID_BG = (15, 22, 15)
-    GRID_LINE = (50, 80, 50)
-    GRID_LINE_BRIGHT = (80, 140, 80)
-    SHIP_COLOR = (90, 120, 90)
-    SHIP_BRIGHT = (120, 160, 120)
-    HIT_COLOR = (220, 50, 30)
-    HIT_BRIGHT = (255, 120, 80)
-    MISS_COLOR = (50, 70, 100)
-    SUNK_COLOR = (140, 30, 20)
-    TEXT_COLOR = (170, 210, 150)
-    TEXT_DIM = (80, 120, 75)
-    ACCENT = (220, 200, 70)
-    CURSOR_COLOR = (220, 200, 70, 80)
+    # Retro palette — tuned for readability
+    BG_COLOR = (18, 18, 32)
+    GRID_BG = (20, 28, 20)
+    GRID_LINE = (60, 90, 60)
+    GRID_LINE_BRIGHT = (100, 160, 100)
+    SHIP_COLOR = (100, 140, 100)
+    SHIP_BRIGHT = (140, 190, 140)
+    HIT_COLOR = (255, 70, 40)
+    HIT_BRIGHT = (255, 140, 100)
+    MISS_COLOR = (70, 100, 140)
+    SUNK_COLOR = (180, 50, 40)
+    TEXT_COLOR = (200, 230, 180)       # Main readable text
+    TEXT_DIM = (140, 170, 130)         # Secondary/dim text — still readable
+    ACCENT = (255, 220, 80)            # Bright yellow for emphasis
 
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
@@ -102,10 +101,12 @@ class Renderer:
 
     def _init_fonts(self) -> None:
         pygame.font.init()
-        self.font_large = pygame.font.SysFont("Courier New", 52, bold=True)
-        self.font_medium = pygame.font.SysFont("Courier New", 22, bold=True)
-        self.font_small = pygame.font.SysFont("Courier New", 14, bold=False)
-        self.font_tiny = pygame.font.SysFont("Courier New", 11, bold=False)
+        # Menlo is the macOS default monospace — renders cleanly as TrueType
+        # Fallback chain ensures cross-platform compatibility
+        self.font_large = pygame.font.SysFont("Menlo", 52, bold=True)
+        self.font_medium = pygame.font.SysFont("Menlo", 22, bold=True)
+        self.font_small = pygame.font.SysFont("Menlo", 14, bold=False)
+        self.font_tiny = pygame.font.SysFont("Menlo", 11, bold=False)
 
     def _toggle_fullscreen(self) -> None:
         if self._fullscreen:
@@ -258,70 +259,66 @@ class Renderer:
             surf.blit(ring, (x - radius - 2, y - radius - 2))
 
     def _draw_scanlines(self, surf: pygame.Surface) -> None:
-        for y in range(0, self.BASE_HEIGHT, 3):
-            pygame.draw.line(surf, (0, 0, 0, 35), (0, y), (self.BASE_WIDTH, y))
+        for y in range(0, self.BASE_HEIGHT, 4):
+            pygame.draw.line(surf, (0, 0, 0, 15), (0, y), (self.BASE_WIDTH, y))
 
     def _draw_vignette(self, surf: pygame.Surface) -> None:
-        for i in range(80):
-            alpha = int(100 * (i / 80) ** 1.5)
+        for i in range(60):
+            alpha = int(45 * (i / 60) ** 1.2)
             pygame.draw.rect(surf, (0, 0, 0, alpha),
                              (i, i, self.BASE_WIDTH - 2 * i, self.BASE_HEIGHT - 2 * i), 1)
 
     def _draw_phosphor_glow(self, surf: pygame.Surface) -> None:
-        """Add subtle green phosphor glow overlay."""
+        """Subtle phosphor glow — very light so text stays readable."""
         glow = pygame.Surface((self.BASE_WIDTH, self.BASE_HEIGHT), pygame.SRCALPHA)
-        for x in range(0, self.BASE_WIDTH, 40):
-            for y in range(0, self.BASE_HEIGHT, 40):
-                pygame.draw.circle(glow, (20, 60, 20, 8), (x, y), 20)
+        for x in range(0, self.BASE_WIDTH, 60):
+            for y in range(0, self.BASE_HEIGHT, 60):
+                pygame.draw.circle(glow, (15, 40, 15, 6), (x, y), 25)
         surf.blit(glow, (0, 0))
 
     def _draw_title_screen(self, surf: pygame.Surface) -> None:
-        # ASCII art title
-        title_lines = [
-            "  ____  ___  _   __  ____  ___  __ _  ____  _  _",
-            " (  __)/ __)/ ) (  )(  __)/ __)(  / )(  __)( \\/ )",
-            "  ) _)( (__ / \\/ \\ )(  ) _( (__  )  (  ) _) / \\/ ",
-            " (__)  \\___)\\_)(_/(____)(___)(___)(__)(____)(_)\\_)",
-        ]
-        t = 0.0
-        for i, line in enumerate(title_lines):
-            x = self.BASE_WIDTH // 2 - len(line) * 5
-            y = 100 + i * 22
-            # Subtle wave
-            wave_y = y + int(math.sin(t + i * 0.5) * 3)
-            s = self.font_small.render(line, False, self.ACCENT)
-            r = s.get_rect(center=(self.BASE_WIDTH // 2, wave_y + 14))
-            surf.blit(s, r)
+        # Bold wordmark title
+        title = self.font_large.render("PyShip", False, self.ACCENT)
+        r = title.get_rect(center=(self.BASE_WIDTH // 2, 130))
+        surf.blit(title, r)
 
         # Subtitle
-        sub = self.font_medium.render("B A T T L E S H I P", False, self.TEXT_COLOR)
-        r = sub.get_rect(center=(self.BASE_WIDTH // 2, 240))
+        sub = self.font_medium.render("BATTLESHIP", False, self.TEXT_COLOR)
+        r = sub.get_rect(center=(self.BASE_WIDTH // 2, 185))
         surf.blit(sub, r)
+
+        # Decorative line
+        line_surf = pygame.Surface((300, 2), pygame.SRCALPHA)
+        line_surf.fill((100, 160, 100, 150))
+        surf.blit(line_surf, (self.BASE_WIDTH // 2 - 150, 205))
 
         # Blinking prompt
         if (pygame.time.get_ticks() // 600) % 2 == 0:
-            p = self.font_small.render(">> PRESS ENTER TO DEPLOY <<", False, self.ACCENT)
-            r = p.get_rect(center=(self.BASE_WIDTH // 2, 360))
+            p = self.font_medium.render("PRESS ENTER TO DEPLOY", False, self.ACCENT)
+            r = p.get_rect(center=(self.BASE_WIDTH // 2, 280))
             surf.blit(p, r)
 
         # Credits line
-        c = self.font_tiny.render("PyShip — A Retro Battleship Experience", False, self.TEXT_DIM)
-        r = c.get_rect(center=(self.BASE_WIDTH // 2, 420))
+        c = self.font_small.render("A Retro Battleship Experience", False, self.TEXT_COLOR)
+        r = c.get_rect(center=(self.BASE_WIDTH // 2, 330))
         surf.blit(c, r)
 
         # Controls panel
         panel_lines = [
-            "━━━ CONTROLS ━━━",
-            "A-J  COLUMN    1-0  ROW",
-            "ENTER  FIRE     R  ROTATE",
-            "F11  FULLSCREEN  ESC  MENU",
+            "CONTROLS",
+            "A-J   : Column    1-0 : Row (0 = 10)",
+            "Enter : Fire      R   : Rotate ship",
+            "F11   : Fullscreen    Esc : Menu",
         ]
-        px = self.BASE_WIDTH // 2 - 120
-        py = 470
+        px = self.BASE_WIDTH // 2
+        py = 420
         for line in panel_lines:
-            s = self.font_tiny.render(line, False, self.TEXT_DIM)
-            surf.blit(s, (px, py))
-            py += 16
+            is_header = line == "CONTROLS"
+            s = self.font_medium.render(line, False,
+                                       self.TEXT_COLOR if is_header else self.TEXT_DIM)
+            r = s.get_rect(center=(px, py))
+            surf.blit(s, r)
+            py += 30
 
     def _draw_placement_phase(self, surf: pygame.Surface) -> None:
         # Header
