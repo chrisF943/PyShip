@@ -29,6 +29,9 @@ def main() -> None:
             if event.type == pygame.QUIT:
                 running = False
 
+            if event.type == pygame.VIDEORESIZE:
+                renderer.handle_resize()
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_F11:
                     renderer._toggle_fullscreen()
