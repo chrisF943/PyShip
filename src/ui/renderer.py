@@ -10,17 +10,18 @@ from src.game.state import CellState, Phase, ShipType
 # -------------------------------------------------------------------
 # Layout constants — all positions derived from these
 # -------------------------------------------------------------------
-BASE_WIDTH = 960
+BASE_WIDTH = 1152        # 16:10 aspect ratio — fills Retina display fully
 BASE_HEIGHT = 720
-CELL_SIZE = 32          # Grid cell in pixels
-GRID_W = CELL_SIZE * 10  # 320px per grid
+CELL_SIZE = 36           # Grid cell in pixels
+GRID_W = CELL_SIZE * 10  # 360px per grid
 GRID_H = CELL_SIZE * 10
+GRID_GAP = 72            # Gap between the two grids
 
-# Grid origins
-PL_OX = 30             # Player grid left
-PL_OY = 80             # Player grid top (below labels)
-EN_OX = BASE_WIDTH // 2 + 20  # Enemy grid left
-EN_OY = 60             # Enemy grid top (column headers need room above)
+# Grid origins — centered horizontally, clear of 50px vignette
+PL_OX = (BASE_WIDTH - 2 * GRID_W - GRID_GAP) // 2   # ~180
+PL_OY = 100
+EN_OX = PL_OX + GRID_W + GRID_GAP                    # ~540
+EN_OY = 100
 
 
 class Renderer:
@@ -58,9 +59,6 @@ class Renderer:
         self._offset_x = 0
         self._offset_y = 0
 
-        # Targeting cursor
-        self._cursor_col = 0
-        self._cursor_row = 0
 
         # Procedural ship sprites
         self._ship_sprites = self._generate_ship_sprites()
@@ -84,9 +82,9 @@ class Renderer:
     def _init_fonts(self) -> None:
         pygame.font.init()
         self.font_large = pygame.font.SysFont("Menlo", 48, bold=True)
-        self.font_medium = pygame.font.SysFont("Menlo", 20, bold=True)
-        self.font_small = pygame.font.SysFont("Menlo", 14, bold=False)
-        self.font_tiny = pygame.font.SysFont("Menlo", 11, bold=False)
+        self.font_medium = pygame.font.SysFont("Menlo", 22, bold=True)
+        self.font_small = pygame.font.SysFont("Menlo", 20, bold=False)
+        self.font_tiny = pygame.font.SysFont("Menlo", 16, bold=False)
 
     def _update_scale(self) -> None:
         """Recalculate scale factor and centering offset from current screen size."""
@@ -115,7 +113,7 @@ class Renderer:
 
     def _blit_text(self, surf: pygame.Surface, text: str, x: int, y: int,
                    color: tuple[int, int, int]) -> None:
-        s = self.font_small.render(text, False, color)
+        s = self.font_small.render(text, True, color)
         surf.blit(s, (x, y))
 
     # -------------------------------------------------------------------
@@ -132,7 +130,7 @@ class Renderer:
             pygame.draw.rect(surf, (20, 40, 70), (x, y, w, h))
             pygame.draw.rect(surf, self.SHIP_COLOR, (x, y, w, h))
             pygame.draw.rect(surf, self.SHIP_BRIGHT, (x + 2, y + 2, w - 4, 3))
-        elif cell == CellState.EMPTY:
+        elif cell == CellState.EMPTY or (cell == CellState.SHIP and not show_ship):
             pygame.draw.rect(surf, (18, 35, 65), (x, y, w, h))
         elif cell == CellState.HIT:
             pygame.draw.rect(surf, (20, 40, 70), (x, y, w, h))
@@ -141,8 +139,12 @@ class Renderer:
             pygame.draw.rect(surf, (18, 35, 65), (x, y, w, h))
             self._draw_miss(surf, x, y, w, h)
         elif cell == CellState.SUNK:
-            pygame.draw.rect(surf, (30, 10, 10), (x, y, w, h))
+            pulse = 0.6 + 0.4 * math.sin(self._anim_time * 4)
+            r_val = int(80 * pulse)
+            pygame.draw.rect(surf, (r_val, 10, 10), (x, y, w, h))
             self._draw_hit(surf, x, y, w, h)
+            # Border to outline the sunk ship
+            pygame.draw.rect(surf, (180, 40, 40), (x, y, w, h), 2)
 
     def _draw_hit(self, surf: pygame.Surface, x: int, y: int, w: int, h: int) -> None:
         intensity = 0.7 + 0.3 * math.sin(self._anim_time * 6)
@@ -164,20 +166,20 @@ class Renderer:
         sz = grid.size
 
         if title:
-            t = self.font_small.render(title, False, self.TEXT_DIM)
-            surf.blit(t, (ox, oy - 22))
+            t = self.font_small.render(title, True, self.TEXT_COLOR)
+            surf.blit(t, (ox, oy - 38))
 
         # Column labels (A-J)
         for c in range(sz):
             lbl = chr(ord("A") + c)
-            s = self.font_tiny.render(lbl, False, self.TEXT_DIM)
-            surf.blit(s, (ox + c * gs + gs // 2 - s.get_width() // 2, oy - 16))
+            s = self.font_tiny.render(lbl, True, self.TEXT_COLOR)
+            surf.blit(s, (ox + c * gs + gs // 2 - s.get_width() // 2, oy - 18))
 
         # Row labels (1-10)
         for r in range(sz):
             lbl = str(r + 1)
-            s = self.font_tiny.render(lbl, False, self.TEXT_DIM)
-            surf.blit(s, (ox - 18, oy + r * gs + gs // 2 - s.get_height() // 2))
+            s = self.font_tiny.render(lbl, True, self.TEXT_COLOR)
+            surf.blit(s, (ox - s.get_width() - 6, oy + r * gs + gs // 2 - s.get_height() // 2))
 
         # Grid background
         bg = pygame.Surface((sz * gs, sz * gs), pygame.SRCALPHA)
@@ -213,10 +215,10 @@ class Renderer:
     def _draw_fire_effect(self, surf: pygame.Surface) -> None:
         if not self.engine._fire_animation:
             return
-        col, row, timer = self.engine._fire_animation
+        col, row, timer, is_enemy = self.engine._fire_animation
         gs = CELL_SIZE
-        x = EN_OX + col * gs + gs // 2
-        y = EN_OY + row * gs + gs // 2
+        x = (EN_OX if is_enemy else PL_OX) + col * gs + gs // 2
+        y = (EN_OY if is_enemy else PL_OY) + row * gs + gs // 2
         radius = int((0.5 - timer) * gs * 2)
         if radius > 0:
             alpha = int(timer * 2 * 200)
@@ -244,12 +246,12 @@ class Renderer:
         surf.fill(self.BG_COLOR)
 
         # Wordmark
-        title = self.font_large.render("PyShip", False, self.ACCENT)
+        title = self.font_large.render("PyShip", True, self.ACCENT)
         r = title.get_rect(center=(BASE_WIDTH // 2, 150))
         surf.blit(title, r)
 
         # Subtitle
-        sub = self.font_medium.render("BATTLESHIP", False, self.TEXT_COLOR)
+        sub = self.font_medium.render("BATTLESHIP", True, self.TEXT_COLOR)
         r = sub.get_rect(center=(BASE_WIDTH // 2, 205))
         surf.blit(sub, r)
 
@@ -260,30 +262,31 @@ class Renderer:
 
         # Blinking prompt
         if (pygame.time.get_ticks() // 600) % 2 == 0:
-            p = self.font_medium.render("PRESS ENTER TO DEPLOY", False, self.ACCENT)
+            p = self.font_medium.render("PRESS ENTER TO DEPLOY", True, self.ACCENT)
             r = p.get_rect(center=(BASE_WIDTH // 2, 310))
             surf.blit(p, r)
 
         # Tagline — larger font for readability
-        c = self.font_medium.render("A Retro Battleship Experience", False, self.TEXT_COLOR)
+        c = self.font_medium.render("A Retro Battleship Experience", True, self.TEXT_COLOR)
         r = c.get_rect(center=(BASE_WIDTH // 2, 355))
         surf.blit(c, r)
 
         # Controls panel
         controls = [
             ("CONTROLS", True),
-            ("A-J  :  Column (A=1, J=10)", False),
-            ("1-0  :  Row    (0 = 10)", False),
-            ("Enter:  Fire", False),
-            ("R    :  Rotate ship", False),
-            ("F11  :  Fullscreen", False),
-            ("Esc  :  Back to title", False),
+            ("Arrows:  Move cursor", False),
+            ("A-J   :  Jump to column", False),
+            ("1-0   :  Jump to row", False),
+            ("Enter :  Place / Fire", False),
+            ("R     :  Rotate ship", False),
+            ("F11   :  Fullscreen", False),
+            ("Esc   :  Back to title", False),
         ]
         cy = 430
         for text, is_header in controls:
             color = self.TEXT_COLOR if is_header else self.TEXT_COLOR
             f = self.font_medium if is_header else self.font_medium
-            s = f.render(text, False, color)
+            s = f.render(text, True, color)
             r = s.get_rect(center=(BASE_WIDTH // 2, cy))
             surf.blit(s, r)
             cy += 32 if is_header else 28
@@ -292,62 +295,89 @@ class Renderer:
         surf.fill(self.BG_COLOR)
 
         # Header
-        h = self.font_medium.render("DEPLOY YOUR FLEET", False, self.ACCENT)
-        r = h.get_rect(center=(BASE_WIDTH // 2, 28))
+        h = self.font_medium.render("DEPLOY YOUR FLEET", True, self.ACCENT)
+        r = h.get_rect(center=(BASE_WIDTH // 2, 30))
         surf.blit(h, r)
 
         # Ship selection list (left side)
         ships_info = [
-            ("[1]  CARRIER     5 cells", ShipType.CARRIER),
-            ("[2]  BATTLESHIP 4 cells", ShipType.BATTLESHIP),
-            ("[3]  CRUISER     3 cells", ShipType.CRUISER),
-            ("[4]  SUBMARINE   3 cells", ShipType.SUBMARINE),
-            ("[5]  DESTROYER   2 cells", ShipType.DESTROYER),
+            ("[1] CARRIER    5", ShipType.CARRIER),
+            ("[2] BATTLESHIP 4", ShipType.BATTLESHIP),
+            ("[3] CRUISER    3", ShipType.CRUISER),
+            ("[4] SUBMARINE  3", ShipType.SUBMARINE),
+            ("[5] DESTROYER  2", ShipType.DESTROYER),
         ]
-        placed = {s[1] for _, s in self.engine.player_grid.ships}
+        placed = {ship.type for ship, _, _, _ in self.engine.player_grid.ships}
         for i, (label, st) in enumerate(ships_info):
-            py = 60 + i * 24
+            py = 56 + i * 22
             is_selected = self.engine.state.selected_ship == st
             is_placed = st in placed
             if is_placed:
                 color = self.TEXT_DIM
-                flag = "  [DEPLOYED]"
+                flag = " [DEPLOYED]"
             elif is_selected:
                 color = self.ACCENT
-                flag = "  [SELECTED]"
+                flag = " [SELECTED]"
             else:
                 color = self.TEXT_COLOR
                 flag = ""
             line = label + flag
-            s = self.font_small.render(line, False, color)
-            surf.blit(s, (30, py))
+            s = self.font_small.render(line, True, color)
+            surf.blit(s, (PL_OX, py))
 
         # Direction indicator
         rot = "HORIZONTAL [R]" if self.engine.state.placement_horizontal else "VERTICAL [R]"
-        rtxt = self.font_small.render(rot, False, self.TEXT_DIM)
-        surf.blit(rtxt, (30, 195))
+        rtxt = self.font_small.render(rot, True, self.TEXT_COLOR)
+        surf.blit(rtxt, (PL_OX, 170))
 
         # Player grid (left, below ship list)
-        pl_oy = 225
-        pl_lbl = self.font_small.render("YOUR FLEET", False, self.TEXT_DIM)
-        surf.blit(pl_lbl, (PL_OX, pl_oy - 20))
-        self._draw_grid(surf, self.engine.player_grid, PL_OX, pl_oy, show_ships=True)
+        pl_oy = 245
+        self._draw_grid(surf, self.engine.player_grid, PL_OX, pl_oy,
+                        show_ships=True, title="YOUR FLEET")
+
+        # Placement preview (ghost ship at cursor)
+        if self.engine.state.selected_ship:
+            from src.board.grid import Ship as _Ship
+            preview_ship = _Ship(self.engine.state.selected_ship)
+            cc, cr = self.engine.cursor_col, self.engine.cursor_row
+            can_place = self.engine.player_grid.can_place(
+                preview_ship, cc, cr, self.engine.state.placement_horizontal
+            )
+            preview_color = (60, 200, 60, 80) if can_place else (200, 60, 60, 80)
+            gs = CELL_SIZE
+            cells = []
+            for i in range(preview_ship.size):
+                if self.engine.state.placement_horizontal:
+                    cells.append((cc + i, cr))
+                else:
+                    cells.append((cc, cr + i))
+            for c, r in cells:
+                if 0 <= c < 10 and 0 <= r < 10:
+                    px = PL_OX + c * gs + 2
+                    py_cell = pl_oy + r * gs + 2
+                    ghost = pygame.Surface((gs - 4, gs - 4), pygame.SRCALPHA)
+                    ghost.fill(preview_color)
+                    surf.blit(ghost, (px, py_cell))
+
+            # Also draw the cursor highlight
+            self._draw_cursor(surf, cc, cr, gs, PL_OX, pl_oy)
 
         # Enemy grid (right, hidden)
-        en_oy = 225
-        en_lbl = self.font_small.render("ENEMY WATERS (HIDDEN)", False, self.TEXT_DIM)
-        surf.blit(en_lbl, (EN_OX, en_oy - 20))
-        self._draw_grid(surf, self.engine.enemy_grid, EN_OX, en_oy, show_ships=False)
+        en_oy = 245
+        self._draw_grid(surf, self.engine.enemy_grid, EN_OX, en_oy,
+                        show_ships=False, title="ENEMY WATERS")
 
         # Message
-        msg = self.engine.state.message or "Select a ship, press Enter to deploy"
-        mc = self.ACCENT if self.engine.state.message else self.TEXT_DIM
-        m = self.font_small.render(msg, False, mc)
-        surf.blit(m, (30, 650))
+        msg = self.engine.state.message or "Select ship (1-5), position with arrows, Enter to place"
+        mc = self.ACCENT if self.engine.state.message else self.TEXT_COLOR
+        m = self.font_small.render(msg, True, mc)
+        r = m.get_rect(center=(BASE_WIDTH // 2, 660))
+        surf.blit(m, r)
 
         # F11
-        f11 = self.font_tiny.render("[F11] Fullscreen", False, self.TEXT_DIM)
-        surf.blit(f11, (BASE_WIDTH - 110, 650))
+        f11 = self.font_tiny.render("[F11] Fullscreen", True, self.TEXT_COLOR)
+        f11_r = f11.get_rect(right=BASE_WIDTH - 60, top=640)
+        surf.blit(f11, f11_r)
 
     def _draw_battle_phase(self, surf: pygame.Surface) -> None:
         phase = self.engine.state.phase
@@ -358,97 +388,106 @@ class Renderer:
         color = self.ACCENT if is_player else self.HIT_COLOR
         pulse = 0.7 + 0.3 * math.sin(self._anim_time * 4)
         r_color = (int(color[0] * pulse), int(color[1] * pulse), int(color[2] * pulse))
-        h = self.font_medium.render(label, False, r_color)
-        r = h.get_rect(center=(BASE_WIDTH // 2, 26))
+        h = self.font_medium.render(label, True, r_color)
+        r = h.get_rect(center=(BASE_WIDTH // 2, 30))
         surf.blit(h, r)
 
         gs = CELL_SIZE
 
         # --- Left: Player grid ---
-        pl_lbl = self.font_small.render("YOUR FLEET", False, self.TEXT_DIM)
-        surf.blit(pl_lbl, (PL_OX, PL_OY - 20))
-        self._draw_grid(surf, self.engine.player_grid, PL_OX, PL_OY, show_ships=True)
+        self._draw_grid(surf, self.engine.player_grid, PL_OX, PL_OY,
+                        show_ships=True, title="YOUR FLEET")
 
         # --- Right: Enemy grid ---
-        en_lbl = self.font_small.render("ENEMY WATERS", False, self.TEXT_DIM)
-        surf.blit(en_lbl, (EN_OX, EN_OY - 20))
-        self._draw_grid(surf, self.engine.enemy_grid, EN_OX, EN_OY, show_ships=False)
+        self._draw_grid(surf, self.engine.enemy_grid, EN_OX, EN_OY,
+                        show_ships=False, title="ENEMY WATERS")
 
         # Targeting cursor on enemy grid
         if is_player:
-            self._draw_cursor(surf, self._cursor_col, self._cursor_row, gs, EN_OX, EN_OY)
+            self._draw_cursor(surf, self.engine.cursor_col, self.engine.cursor_row, gs, EN_OX, EN_OY)
         self._draw_fire_effect(surf)
 
-        # --- Info panel (right of grids) ---
-        panel_x = EN_OX + GRID_W + 20
-        panel_y = 60
+        # --- Info panel (below grids) ---
+        grid_bottom = PL_OY + GRID_H + 15
+        panel_x = PL_OX
 
-        # Ship status
-        panel_title = self.font_small.render("FLEET STATUS", False, self.TEXT_COLOR)
-        surf.blit(panel_title, (panel_x, panel_y))
-        panel_y += 22
+        # YOUR fleet status (left side)
+        panel_title = self.font_small.render("YOUR SHIPS", True, self.ACCENT)
+        surf.blit(panel_title, (panel_x, grid_bottom))
 
+        ship_x = panel_x
+        ship_y = grid_bottom + 24
         for ship, sx, sy, horiz in self.engine.player_grid.ships:
-            damage = "■■■■■"[:ship.hits] + "-----"[:ship.size - ship.hits]
-            stype = ship.type.name
-            color = self.SUNK_COLOR if ship.hits >= ship.size else self.TEXT_DIM
-            line = f"  {stype:<12}{damage}"
-            s = self.font_tiny.render(line, False, color)
-            surf.blit(s, (panel_x, panel_y))
-            panel_y += 14
+            damage = "■" * ship.hits + "□" * (ship.size - ship.hits)
+            stype = ship.type.name[:4]
+            color = self.SUNK_COLOR if ship.hits >= ship.size else self.TEXT_COLOR
+            line = f"{stype} {damage}"
+            s = self.font_small.render(line, True, color)
+            surf.blit(s, (ship_x, ship_y))
+            ship_y += 22
 
-        panel_y += 10
+        # ENEMY fleet status (right side)
+        enemy_title = self.font_small.render("ENEMY SHIPS", True, self.HIT_COLOR)
+        enemy_title_r = enemy_title.get_rect(right=EN_OX + GRID_W, top=grid_bottom)
+        surf.blit(enemy_title, enemy_title_r)
 
-        # Divider
-        div = pygame.Surface((panel_x + 120, 1), pygame.SRCALPHA)
-        div.fill((80, 120, 80, 100))
-        surf.blit(div, (panel_x, panel_y))
-        panel_y += 12
+        enemy_y = grid_bottom + 24
+        for ship, sx, sy, horiz in self.engine.enemy_grid.ships:
+            stype = ship.type.name[:4]
+            is_sunk = ship.hits >= ship.size
+            if is_sunk:
+                damage = "X" * ship.size
+                color = self.SUNK_COLOR
+                status = "SUNK"
+            else:
+                damage = "?" * ship.size
+                color = self.TEXT_COLOR
+                status = ""
+            line = f"{stype} {damage} {status}"
+            s = self.font_small.render(line, True, color)
+            s_r = s.get_rect(right=EN_OX + GRID_W, top=enemy_y)
+            surf.blit(s, s_r)
+            enemy_y += 22
 
-        # Targeting coord
+        # Targeting coord (centered)
         if is_player:
-            coord = f"TARGET: {chr(65 + self._cursor_col)}{self._cursor_row + 1}"
+            coord = f"TARGET: {chr(65 + self.engine.cursor_col)}{self.engine.cursor_row + 1}"
         else:
             coord = "TARGETING..."
-        ct = self.font_small.render(coord, False, self.ACCENT)
-        surf.blit(ct, (panel_x, panel_y))
-        panel_y += 30
+        ct = self.font_medium.render(coord, True, self.ACCENT)
+        ct_r = ct.get_rect(center=(BASE_WIDTH // 2, grid_bottom + 4))
+        surf.blit(ct, ct_r)
 
-        # Controls
-        for line in ["A-J  : Column", "1-0  : Row", "Enter: Fire", "Esc  : Menu"]:
-            s = self.font_tiny.render(line, False, self.TEXT_DIM)
-            surf.blit(s, (panel_x, panel_y))
-            panel_y += 16
+        # Controls (centered, below target)
+        ctrl_y = grid_bottom + 30
+        for line in ["Arrows/A-J/1-0: Move", "Enter: Fire   Esc: Menu"]:
+            s = self.font_small.render(line, True, self.TEXT_COLOR)
+            ct_r = s.get_rect(center=(BASE_WIDTH // 2, ctrl_y))
+            surf.blit(s, ct_r)
+            ctrl_y += 22
 
-        # Legend (far right)
-        lx = panel_x
-        ly = 560
-        legend_title = self.font_tiny.render("LEGEND", False, self.TEXT_DIM)
-        surf.blit(legend_title, (lx, ly))
-        ly += 16
-        for lbl, col in [
-            ("Ship", self.SHIP_COLOR), ("Hit", self.HIT_COLOR),
-            ("Miss", self.MISS_COLOR), ("Sunk", self.SUNK_COLOR)
-        ]:
-            pygame.draw.rect(surf, col, (lx, ly, 10, 10))
-            t = self.font_tiny.render(lbl, False, self.TEXT_DIM)
-            surf.blit(t, (lx + 16, ly))
-            lx += 70
-            if lbl == "Miss":
-                lx = panel_x
-                ly += 18
-
-        # Message bar (below grids, spanning both)
+        # Message bar (bottom, centered) — extra emphasis for sinks
         msg = self.engine.state.message or ""
         if msg:
-            mc = self.HIT_COLOR if any(k in msg for k in ("Hit", "hit", "sunk")) else self.TEXT_COLOR
-            m = self.font_medium.render(msg, False, mc)
-            r = m.get_rect(center=(BASE_WIDTH // 2, 620))
+            is_sink = "sunk" in msg.lower()
+            is_hit = any(k in msg for k in ("Hit", "hit")) or is_sink
+            if is_sink:
+                mc = (255, 100, 50)
+                font = self.font_medium
+            elif is_hit:
+                mc = self.HIT_COLOR
+                font = self.font_medium
+            else:
+                mc = self.TEXT_COLOR
+                font = self.font_medium
+            m = font.render(msg, True, mc)
+            r = m.get_rect(center=(BASE_WIDTH // 2, 630))
             surf.blit(m, r)
 
         # F11
-        f11 = self.font_tiny.render("[F11] Fullscreen", False, self.TEXT_DIM)
-        surf.blit(f11, (BASE_WIDTH - 110, 650))
+        f11 = self.font_tiny.render("[F11] Fullscreen", True, self.TEXT_COLOR)
+        f11_r = f11.get_rect(right=BASE_WIDTH - 60, top=650)
+        surf.blit(f11, f11_r)
 
     def _draw_game_over_screen(self, surf: pygame.Surface) -> None:
         overlay = pygame.Surface((BASE_WIDTH, BASE_HEIGHT), pygame.SRCALPHA)
@@ -461,17 +500,17 @@ class Renderer:
 
         pulse = 0.8 + 0.2 * math.sin(self._anim_time * 3)
         r_color = (int(color[0] * pulse), int(color[1] * pulse), int(color[2] * pulse))
-        big = self.font_large.render(main, False, r_color)
+        big = self.font_large.render(main, True, r_color)
         r = big.get_rect(center=(BASE_WIDTH // 2, 260))
         surf.blit(big, r)
 
         sub_text = "The enemy fleet has been destroyed." if win else "Your fleet has been destroyed."
-        s = self.font_medium.render(sub_text, False, self.TEXT_COLOR)
+        s = self.font_medium.render(sub_text, True, self.TEXT_COLOR)
         r = s.get_rect(center=(BASE_WIDTH // 2, 320))
         surf.blit(s, r)
 
         if (pygame.time.get_ticks() // 600) % 2 == 0:
-            p = self.font_small.render("PRESS ENTER TO CONTINUE", False, self.TEXT_DIM)
+            p = self.font_small.render("PRESS ENTER TO CONTINUE", True, self.TEXT_DIM)
             r = p.get_rect(center=(BASE_WIDTH // 2, 400))
             surf.blit(p, r)
 
@@ -503,7 +542,7 @@ class Renderer:
         self._screen.fill((0, 0, 0))
         scaled_w = int(BASE_WIDTH * self._scale)
         scaled_h = int(BASE_HEIGHT * self._scale)
-        scaled = pygame.transform.smoothscale(surf, (scaled_w, scaled_h))
+        scaled = pygame.transform.scale(surf, (scaled_w, scaled_h))
         self._screen.blit(scaled, (self._offset_x, self._offset_y))
 
         pygame.display.flip()

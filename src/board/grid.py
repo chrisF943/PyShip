@@ -50,7 +50,6 @@ class Grid:
         return [(x + i, y) if horizontal else (x, y + i) for i in range(size)]
 
     def receive_shot(self, col: int, row: int):
-        from game.state import CellState, Outcome, Phase
         cell = self.cells[row][col]
         if cell == CellState.SHIP:
             self.cells[row][col] = CellState.HIT

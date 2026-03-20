@@ -27,10 +27,13 @@ class Engine:
         self.ai_last_hit: Optional[tuple[int, int]] = None
         self.ai_pending_hits: list[tuple[int, int]] = []
 
-        self._last_col: Optional[int] = None
-        self._last_row: int = 0
-        self._fire_animation: Optional[tuple[int, int, float]] = None  # col, row, timer
+
+        self._fire_animation: Optional[tuple[int, int, float, bool]] = None  # col, row, timer, is_enemy_target
         self.sfx: Optional[object] = None  # Set by main.py
+
+        # Shared cursor for placement & targeting
+        self.cursor_col = 0
+        self.cursor_row = 0
 
         self._random_ai_place()
 
@@ -47,9 +50,33 @@ class Engine:
                 except PlacementError:
                     pass
 
+    def _move_cursor(self, event_key: int) -> None:
+        """Handle arrow key and A-J / 1-0 cursor movement."""
+        if event_key == pygame.K_UP:
+            self.cursor_row = max(0, self.cursor_row - 1)
+        elif event_key == pygame.K_DOWN:
+            self.cursor_row = min(self.GRID_SIZE - 1, self.cursor_row + 1)
+        elif event_key == pygame.K_LEFT:
+            self.cursor_col = max(0, self.cursor_col - 1)
+        elif event_key == pygame.K_RIGHT:
+            self.cursor_col = min(self.GRID_SIZE - 1, self.cursor_col + 1)
+        elif event_key in (
+            pygame.K_a, pygame.K_b, pygame.K_c, pygame.K_d, pygame.K_e,
+            pygame.K_f, pygame.K_g, pygame.K_h, pygame.K_i, pygame.K_j
+        ):
+            self.cursor_col = event_key - pygame.K_a
+        elif event_key in (
+            pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4,
+            pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8,
+            pygame.K_9, pygame.K_0
+        ):
+            if event_key == pygame.K_0:
+                self.cursor_row = 9
+            else:
+                self.cursor_row = event_key - pygame.K_1
+
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type == pygame.VIDEORESIZE:
-            # Handled in main.py renderer
             return
 
         if event.type == pygame.KEYDOWN:
@@ -61,6 +88,13 @@ class Engine:
                 if event.key in (pygame.K_RETURN, pygame.K_SPACE):
                     self.state.reset()
                     self.player_grid.clear()
+                    self.enemy_grid.clear()
+                    self.player_shots.clear()
+                    self.ai_shot_history.clear()
+                    self.ai_pending_hits.clear()
+                    self.ai_last_hit = None
+                    self.cursor_col = 0
+                    self.cursor_row = 0
                     self._random_ai_place()
                 return
 
@@ -70,56 +104,63 @@ class Engine:
                 return
 
             if self.state.phase == Phase.PLACEMENT:
-                if event.key == pygame.K_r:
-                    self.state.placement_horizontal = not self.state.placement_horizontal
+                # Ship selection (1-5 selects ship type)
+                placed_types = {ship.type for ship, _, _, _ in self.player_grid.ships}
                 if event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5):
                     ships = list(ShipType)
                     idx = event.key - pygame.K_1
                     if idx < len(ships):
-                        self.state.selected_ship = ships[idx]
-                if event.key == pygame.K_RETURN and self.state.selected_ship:
+                        if ships[idx] in placed_types:
+                            self.state.message = f"{ships[idx].name} already deployed!"
+                        else:
+                            self.state.selected_ship = ships[idx]
+                            self.state.message = ""
+                # Rotation
+                elif event.key == pygame.K_r:
+                    self.state.placement_horizontal = not self.state.placement_horizontal
+                # Place ship at cursor
+                elif event.key == pygame.K_RETURN and self.state.selected_ship:
                     self._confirm_placement()
+                # Cursor movement (arrows + A-J for col, 6-0 for row)
+                elif event.key in (
+                    pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT,
+                    pygame.K_a, pygame.K_b, pygame.K_c, pygame.K_d, pygame.K_e,
+                    pygame.K_f, pygame.K_g, pygame.K_h, pygame.K_i, pygame.K_j,
+                    pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9, pygame.K_0
+                ):
+                    self._move_cursor(event.key)
                 return
 
             if self.state.phase == Phase.PLAYER_TURN:
-                if event.key in (
-                    pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4,
-                    pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8,
-                    pygame.K_9, pygame.K_0
-                ):
-                    row = event.key - pygame.K_1
-                    if event.key == pygame.K_0:
-                        row = 9
-                    self._last_row = row
-                elif event.key in (
-                    pygame.K_a, pygame.K_b, pygame.K_c, pygame.K_d, pygame.K_e,
-                    pygame.K_f, pygame.K_g, pygame.K_h, pygame.K_i, pygame.K_j
-                ):
-                    col = event.key - pygame.K_a
-                    if 0 <= col < self.GRID_SIZE:
-                        self._player_fire(col, self._last_row)
-                        self._fire_animation = (col, self._last_row, 0.5)
+                # Cursor movement
+                self._move_cursor(event.key)
+                # Fire on Enter
+                if event.key == pygame.K_RETURN:
+                    col, row = self.cursor_col, self.cursor_row
+                    if (col, row) in self.player_shots:
+                        self.state.message = "Already fired there!"
+                    else:
+                        self._player_fire(col, row)
+                        self._fire_animation = (col, row, 0.5, True)
 
     def _confirm_placement(self) -> None:
         if not self.state.selected_ship:
             return
         ship = Ship(self.state.selected_ship)
-        for y in range(self.GRID_SIZE):
-            for x in range(self.GRID_SIZE):
-                if self.player_grid.can_place(ship, x, y, self.state.placement_horizontal):
-                    try:
-                        self.player_grid.place_ship(
-                            ship, x, y, self.state.placement_horizontal
-                        )
-                        self.state.selected_ship = None
-                        if self.sfx:
-                            self.sfx.play("fire")
-                        if self.player_grid.all_ships_placed():
-                            self.state.phase = Phase.PLAYER_TURN
-                            self.state.message = "Your turn — fire at the enemy!"
-                        return
-                    except PlacementError:
-                        pass
+        x, y = self.cursor_col, self.cursor_row
+        if self.player_grid.can_place(ship, x, y, self.state.placement_horizontal):
+            self.player_grid.place_ship(ship, x, y, self.state.placement_horizontal)
+            self.state.message = f"{self.state.selected_ship.name} deployed!"
+            self.state.selected_ship = None
+            if self.sfx:
+                self.sfx.play("fire")
+            if self.player_grid.all_ships_placed():
+                self.state.phase = Phase.PLAYER_TURN
+                self.state.message = "All ships deployed! Your turn — fire at the enemy!"
+                self.cursor_col = 0
+                self.cursor_row = 0
+        else:
+            self.state.message = "Can't place there! Try another position."
 
     def _player_fire(self, col: int, row: int) -> None:
         if (col, row) in self.player_shots:
@@ -159,7 +200,7 @@ class Engine:
 
         self.ai_shot_history.append((col, row))
         result = self.player_grid.receive_shot(col, row)
-        self._fire_animation = (col, row, 0.5)
+        self._fire_animation = (col, row, 0.5, False)
         if self.sfx:
             self.sfx.play("fire")
         if result.hit:
@@ -194,7 +235,7 @@ class Engine:
         if self.state.phase == Phase.ENEMY_TURN:
             self._ai_fire()
         if self._fire_animation:
-            col, row, timer = self._fire_animation
-            self._fire_animation = (col, row, timer - 1/60)
+            col, row, timer, is_enemy = self._fire_animation
+            self._fire_animation = (col, row, timer - 1/60, is_enemy)
             if self._fire_animation[2] <= 0:
                 self._fire_animation = None
