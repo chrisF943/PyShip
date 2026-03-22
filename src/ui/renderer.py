@@ -425,7 +425,7 @@ class Renderer:
             line = f"{stype} {damage}"
             s = self.font_small.render(line, True, color)
             surf.blit(s, (ship_x, ship_y))
-            ship_y += 14
+            ship_y += 16
 
         # ENEMY fleet status (right side)
         enemy_title = self.font_small.render("ENEMY SHIPS", True, self.HIT_COLOR)
@@ -448,7 +448,7 @@ class Renderer:
             s = self.font_small.render(line, True, color)
             s_r = s.get_rect(right=EN_OX + GRID_W, top=enemy_y)
             surf.blit(s, s_r)
-            enemy_y += 14
+            enemy_y += 16
 
         # Targeting coord (centered)
         if is_player:
