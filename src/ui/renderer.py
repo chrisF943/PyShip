@@ -180,7 +180,7 @@ class Renderer:
         for r in range(sz):
             lbl = str(r + 1)
             s = self.font_tiny.render(lbl, True, self.TEXT_COLOR)
-            surf.blit(s, (ox - s.get_width() - 6, oy + r * gs + gs // 2 - s.get_height() // 2))
+            surf.blit(s, (ox - s.get_width() - 10, oy + r * gs + gs // 2 - s.get_height() // 2))
 
         # Grid background
         bg = pygame.Surface((sz * gs, sz * gs), pygame.SRCALPHA)
@@ -377,7 +377,7 @@ class Renderer:
 
         # F11
         f11 = self.font_tiny.render("[F11] Fullscreen", True, self.TEXT_COLOR)
-        f11_r = f11.get_rect(right=BASE_WIDTH - 60, top=680)
+        f11_r = f11.get_rect(right=BASE_WIDTH - 60, top=700)
         surf.blit(f11, f11_r)
 
     def _draw_battle_phase(self, surf: pygame.Surface) -> None:
@@ -460,7 +460,7 @@ class Renderer:
         surf.blit(ct, ct_r)
 
         # Controls (centered, below target)
-        ctrl_y = grid_bottom + 130
+        ctrl_y = grid_bottom + 105
         for line in ["Arrows/A-J/1-0: Move", "Enter: Fire   Esc: Menu"]:
             s = self.font_small.render(line, True, self.TEXT_COLOR)
             ct_r = s.get_rect(center=(BASE_WIDTH // 2, ctrl_y))
@@ -482,12 +482,12 @@ class Renderer:
                 mc = self.TEXT_COLOR
                 font = self.font_medium
             m = font.render(msg, True, mc)
-            r = m.get_rect(center=(BASE_WIDTH // 2, 625))
+            r = m.get_rect(center=(BASE_WIDTH // 2, 650))
             surf.blit(m, r)
 
         # F11
         f11 = self.font_tiny.render("[F11] Fullscreen", True, self.TEXT_COLOR)
-        f11_r = f11.get_rect(right=BASE_WIDTH - 60, top=640)
+        f11_r = f11.get_rect(right=BASE_WIDTH - 60, top=685)
         surf.blit(f11, f11_r)
 
     def _draw_game_over_screen(self, surf: pygame.Surface) -> None:
