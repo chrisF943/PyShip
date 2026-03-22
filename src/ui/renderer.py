@@ -377,7 +377,7 @@ class Renderer:
 
         # F11
         f11 = self.font_tiny.render("[F11] Fullscreen", True, self.TEXT_COLOR)
-        f11_r = f11.get_rect(right=BASE_WIDTH - 60, top=640)
+        f11_r = f11.get_rect(right=BASE_WIDTH - 60, top=680)
         surf.blit(f11, f11_r)
 
     def _draw_battle_phase(self, surf: pygame.Surface) -> None:
@@ -417,7 +417,7 @@ class Renderer:
         surf.blit(panel_title, (panel_x, grid_bottom))
 
         ship_x = panel_x
-        ship_y = grid_bottom + 24
+        ship_y = grid_bottom + 20
         for ship, sx, sy, horiz in self.engine.player_grid.ships:
             damage = "■" * ship.hits + "□" * (ship.size - ship.hits)
             stype = ship.type.name[:4]
@@ -425,14 +425,14 @@ class Renderer:
             line = f"{stype} {damage}"
             s = self.font_small.render(line, True, color)
             surf.blit(s, (ship_x, ship_y))
-            ship_y += 22
+            ship_y += 14
 
         # ENEMY fleet status (right side)
         enemy_title = self.font_small.render("ENEMY SHIPS", True, self.HIT_COLOR)
         enemy_title_r = enemy_title.get_rect(right=EN_OX + GRID_W, top=grid_bottom)
         surf.blit(enemy_title, enemy_title_r)
 
-        enemy_y = grid_bottom + 24
+        enemy_y = grid_bottom + 20
         for ship, sx, sy, horiz in self.engine.enemy_grid.ships:
             stype = ship.type.name[:4]
             is_sunk = ship.hits >= ship.size
@@ -448,7 +448,7 @@ class Renderer:
             s = self.font_small.render(line, True, color)
             s_r = s.get_rect(right=EN_OX + GRID_W, top=enemy_y)
             surf.blit(s, s_r)
-            enemy_y += 22
+            enemy_y += 14
 
         # Targeting coord (centered)
         if is_player:
@@ -460,12 +460,12 @@ class Renderer:
         surf.blit(ct, ct_r)
 
         # Controls (centered, below target)
-        ctrl_y = grid_bottom + 30
+        ctrl_y = grid_bottom + 130
         for line in ["Arrows/A-J/1-0: Move", "Enter: Fire   Esc: Menu"]:
             s = self.font_small.render(line, True, self.TEXT_COLOR)
             ct_r = s.get_rect(center=(BASE_WIDTH // 2, ctrl_y))
             surf.blit(s, ct_r)
-            ctrl_y += 22
+            ctrl_y += 18
 
         # Message bar (bottom, centered) — extra emphasis for sinks
         msg = self.engine.state.message or ""
@@ -482,12 +482,12 @@ class Renderer:
                 mc = self.TEXT_COLOR
                 font = self.font_medium
             m = font.render(msg, True, mc)
-            r = m.get_rect(center=(BASE_WIDTH // 2, 630))
+            r = m.get_rect(center=(BASE_WIDTH // 2, 625))
             surf.blit(m, r)
 
         # F11
         f11 = self.font_tiny.render("[F11] Fullscreen", True, self.TEXT_COLOR)
-        f11_r = f11.get_rect(right=BASE_WIDTH - 60, top=650)
+        f11_r = f11.get_rect(right=BASE_WIDTH - 60, top=640)
         surf.blit(f11, f11_r)
 
     def _draw_game_over_screen(self, surf: pygame.Surface) -> None:

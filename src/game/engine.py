@@ -39,16 +39,17 @@ class Engine:
 
     def _random_ai_place(self) -> None:
         for ship_type in ShipType:
-            placed = False
-            while not placed:
-                x = random.randint(0, self.GRID_SIZE - 1)
-                y = random.randint(0, self.GRID_SIZE - 1)
-                horizontal = random.choice([True, False])
-                try:
-                    self.enemy_grid.place_ship(Ship(ship_type), x, y, horizontal)
-                    placed = True
-                except PlacementError:
-                    pass
+            for _ in range(Ship._max_placements(ship_type)):
+                placed = False
+                while not placed:
+                    x = random.randint(0, self.GRID_SIZE - 1)
+                    y = random.randint(0, self.GRID_SIZE - 1)
+                    horizontal = random.choice([True, False])
+                    try:
+                        self.enemy_grid.place_ship(Ship(ship_type), x, y, horizontal)
+                        placed = True
+                    except PlacementError:
+                        pass
 
     def _move_cursor(self, event_key: int) -> None:
         """Handle arrow key and A-J / 1-0 cursor movement."""
