@@ -105,15 +105,16 @@ class Engine:
 
             if self.state.phase == Phase.PLACEMENT:
                 # Ship selection (1-5 selects ship type)
-                placed_types = {ship.type for ship, _, _, _ in self.player_grid.ships}
                 if event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5):
                     ships = list(ShipType)
                     idx = event.key - pygame.K_1
                     if idx < len(ships):
-                        if ships[idx] in placed_types:
-                            self.state.message = f"{ships[idx].name} already deployed!"
+                        st = ships[idx]
+                        remaining = self._remaining_placements(st)
+                        if remaining <= 0:
+                            self.state.message = f"{st.name} fully deployed!"
                         else:
-                            self.state.selected_ship = ships[idx]
+                            self.state.selected_ship = st
                             self.state.message = ""
                 # Rotation
                 elif event.key == pygame.K_r:
@@ -143,6 +144,16 @@ class Engine:
                         self._player_fire(col, row)
                         self._fire_animation = (col, row, 0.5, True)
 
+    def _remaining_placements(self, ship_type: ShipType) -> int:
+        placed = sum(1 for s, _, _, _ in self.player_grid.ships if s.type == ship_type)
+        return Ship._max_placements(ship_type) - placed
+
+    def _all_ships_placed(self) -> bool:
+        for st in ShipType:
+            if self._remaining_placements(st) > 0:
+                return False
+        return True
+
     def _confirm_placement(self) -> None:
         if not self.state.selected_ship:
             return
@@ -151,14 +162,16 @@ class Engine:
         if self.player_grid.can_place(ship, x, y, self.state.placement_horizontal):
             self.player_grid.place_ship(ship, x, y, self.state.placement_horizontal)
             self.state.message = f"{self.state.selected_ship.name} deployed!"
-            self.state.selected_ship = None
             if self.sfx:
                 self.sfx.play("fire")
-            if self.player_grid.all_ships_placed():
+            if self._all_ships_placed():
+                self.state.selected_ship = None
                 self.state.phase = Phase.PLAYER_TURN
                 self.state.message = "All ships deployed! Your turn — fire at the enemy!"
                 self.cursor_col = 0
                 self.cursor_row = 0
+            elif self._remaining_placements(self.state.selected_ship) <= 0:
+                self.state.selected_ship = None
         else:
             self.state.message = "Can't place there! Try another position."
 

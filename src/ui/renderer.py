@@ -5,6 +5,7 @@ import pygame
 
 from src.game.engine import Engine
 from src.game.state import CellState, Phase, ShipType
+from src.board.grid import Ship
 
 
 # -------------------------------------------------------------------
@@ -301,26 +302,27 @@ class Renderer:
 
         # Ship selection list (left side)
         ships_info = [
-            ("[1] CARRIER    5", ShipType.CARRIER),
-            ("[2] BATTLESHIP 4", ShipType.BATTLESHIP),
-            ("[3] CRUISER    3", ShipType.CRUISER),
-            ("[4] SUBMARINE  3", ShipType.SUBMARINE),
-            ("[5] DESTROYER  2", ShipType.DESTROYER),
+            ("[1] CARRIER", ShipType.CARRIER),
+            ("[2] BATTLESHIP", ShipType.BATTLESHIP),
+            ("[3] CRUISER", ShipType.CRUISER),
+            ("[4] SUBMARINE", ShipType.SUBMARINE),
+            ("[5] DESTROYER", ShipType.DESTROYER),
         ]
-        placed = {ship.type for ship, _, _, _ in self.engine.player_grid.ships}
         for i, (label, st) in enumerate(ships_info):
             py = 56 + i * 22
             is_selected = self.engine.state.selected_ship == st
-            is_placed = st in placed
-            if is_placed:
+            placed_count = sum(1 for s, _, _, _ in self.engine.player_grid.ships if s.type == st)
+            max_placements = Ship._max_placements(st)
+            remaining = max_placements - placed_count
+            if remaining <= 0:
                 color = self.TEXT_DIM
                 flag = " [DEPLOYED]"
             elif is_selected:
                 color = self.ACCENT
-                flag = " [SELECTED]"
+                flag = f" ({remaining})"
             else:
                 color = self.TEXT_COLOR
-                flag = ""
+                flag = f" ({remaining})"
             line = label + flag
             s = self.font_small.render(line, True, color)
             surf.blit(s, (PL_OX, py))
@@ -337,8 +339,7 @@ class Renderer:
 
         # Placement preview (ghost ship at cursor)
         if self.engine.state.selected_ship:
-            from src.board.grid import Ship as _Ship
-            preview_ship = _Ship(self.engine.state.selected_ship)
+            preview_ship = Ship(self.engine.state.selected_ship)
             cc, cr = self.engine.cursor_col, self.engine.cursor_row
             can_place = self.engine.player_grid.can_place(
                 preview_ship, cc, cr, self.engine.state.placement_horizontal

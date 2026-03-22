@@ -24,6 +24,11 @@ class Ship:
         }
         return sizes[st]
 
+    @staticmethod
+    def _max_placements(st: ShipType) -> int:
+        """Number of times each ship type can be placed (destroyer=2, others=1)."""
+        return 2 if st == ShipType.DESTROYER else 1
+
 
 class Grid:
     def __init__(self, size: int = 10) -> None:
