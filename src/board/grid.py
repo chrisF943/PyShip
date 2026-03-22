@@ -33,11 +33,33 @@ class Grid:
         ]
         self.ships: list[tuple[Ship, int, int, bool]] = []
 
+    def _ship_cells(self, x: int, y: int, size: int, horizontal: bool):
+        return [(x + i, y) if horizontal else (x, y + i) for i in range(size)]
+
+    def _buffer_cells(self, cells: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        """Return all 8-neighbor buffer cells around a list of ship cells."""
+        buffer = set()
+        for c, r in cells:
+            for dc in (-1, 0, 1):
+                for dr in (-1, 0, 1):
+                    if dc == 0 and dr == 0:
+                        continue
+                    nc, nr = c + dc, r + dr
+                    if 0 <= nc < self.size and 0 <= nr < self.size:
+                        buffer.add((nc, nr))
+        return list(buffer)
+
     def can_place(self, ship: Ship, x: int, y: int, horizontal: bool) -> bool:
         cells = self._ship_cells(x, y, ship.size, horizontal)
         if not all(0 <= c < self.size and 0 <= r < self.size for c, r in cells):
             return False
-        return all(self.cells[r][c] == CellState.EMPTY for c, r in cells)
+        if not all(self.cells[r][c] == CellState.EMPTY for c, r in cells):
+            return False
+        # 1-tile buffer: all neighboring cells must be empty
+        for c, r in self._buffer_cells(cells):
+            if self.cells[r][c] != CellState.EMPTY:
+                return False
+        return True
 
     def place_ship(self, ship: Ship, x: int, y: int, horizontal: bool) -> None:
         if not self.can_place(ship, x, y, horizontal):
@@ -45,9 +67,6 @@ class Grid:
         for c, r in self._ship_cells(x, y, ship.size, horizontal):
             self.cells[r][c] = CellState.SHIP
         self.ships.append((ship, x, y, horizontal))
-
-    def _ship_cells(self, x: int, y: int, size: int, horizontal: bool):
-        return [(x + i, y) if horizontal else (x, y + i) for i in range(size)]
 
     def receive_shot(self, col: int, row: int):
         cell = self.cells[row][col]
