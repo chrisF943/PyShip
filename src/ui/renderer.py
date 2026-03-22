@@ -20,9 +20,9 @@ GRID_GAP = 72            # Gap between the two grids
 
 # Grid origins — centered horizontally, clear of 50px vignette
 PL_OX = (BASE_WIDTH - 2 * GRID_W - GRID_GAP) // 2   # ~180
-PL_OY = 100
+PL_OY = 101
 EN_OX = PL_OX + GRID_W + GRID_GAP                    # ~540
-EN_OY = 100
+EN_OY = 101
 
 
 class Renderer:
@@ -377,7 +377,7 @@ class Renderer:
 
         # F11
         f11 = self.font_tiny.render("[F11] Fullscreen", True, self.TEXT_COLOR)
-        f11_r = f11.get_rect(right=BASE_WIDTH - 60, top=700)
+        f11_r = f11.get_rect(right=BASE_WIDTH - 60, centery=660)
         surf.blit(f11, f11_r)
 
     def _draw_battle_phase(self, surf: pygame.Surface) -> None:
@@ -425,7 +425,7 @@ class Renderer:
             line = f"{stype} {damage}"
             s = self.font_small.render(line, True, color)
             surf.blit(s, (ship_x, ship_y))
-            ship_y += 16
+            ship_y += 18
 
         # ENEMY fleet status (right side)
         enemy_title = self.font_small.render("ENEMY SHIPS", True, self.HIT_COLOR)
@@ -448,7 +448,7 @@ class Renderer:
             s = self.font_small.render(line, True, color)
             s_r = s.get_rect(right=EN_OX + GRID_W, top=enemy_y)
             surf.blit(s, s_r)
-            enemy_y += 16
+            enemy_y += 18
 
         # Targeting coord (centered)
         if is_player:
@@ -460,7 +460,7 @@ class Renderer:
         surf.blit(ct, ct_r)
 
         # Controls (centered, below target)
-        ctrl_y = grid_bottom + 105
+        ctrl_y = grid_bottom + 65
         for line in ["Arrows/A-J/1-0: Move", "Enter: Fire   Esc: Menu"]:
             s = self.font_small.render(line, True, self.TEXT_COLOR)
             ct_r = s.get_rect(center=(BASE_WIDTH // 2, ctrl_y))
@@ -482,12 +482,12 @@ class Renderer:
                 mc = self.TEXT_COLOR
                 font = self.font_medium
             m = font.render(msg, True, mc)
-            r = m.get_rect(center=(BASE_WIDTH // 2, 650))
+            r = m.get_rect(center=(BASE_WIDTH // 2, 620))
             surf.blit(m, r)
 
         # F11
         f11 = self.font_tiny.render("[F11] Fullscreen", True, self.TEXT_COLOR)
-        f11_r = f11.get_rect(right=BASE_WIDTH - 60, top=685)
+        f11_r = f11.get_rect(right=BASE_WIDTH - 60, centery=660)
         surf.blit(f11, f11_r)
 
     def _draw_game_over_screen(self, surf: pygame.Surface) -> None:
@@ -543,7 +543,7 @@ class Renderer:
         self._screen.fill((0, 0, 0))
         scaled_w = int(BASE_WIDTH * self._scale)
         scaled_h = int(BASE_HEIGHT * self._scale)
-        scaled = pygame.transform.scale(surf, (scaled_w, scaled_h))
+        scaled = pygame.transform.smoothscale(surf, (scaled_w, scaled_h))
         self._screen.blit(scaled, (self._offset_x, self._offset_y))
 
         pygame.display.flip()
