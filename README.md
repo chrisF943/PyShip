@@ -1,4 +1,4 @@
-# PyShip — Battleship
+# PyShip — Retro Battleship
 
 A retro-styled Battleship game built with Python and Pygame. Features CRT scanlines, phosphor glow effects, procedural sound, and a classic terminal-aesthetic UI.
 

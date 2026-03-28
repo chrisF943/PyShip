@@ -510,9 +510,16 @@ class Renderer:
         r = s.get_rect(center=(BASE_WIDTH // 2, 320))
         surf.blit(s, r)
 
+        player_shots = len(self.engine.player_shots)
+        enemy_shots = len(self.engine.ai_shot_history)
+        shot_text = f"You won with {player_shots} shots!" if win else f"You lost in {enemy_shots} shots."
+        st = self.font_medium.render(shot_text, True, color)
+        r2 = st.get_rect(center=(BASE_WIDTH // 2, 360))
+        surf.blit(st, r2)
+
         if (pygame.time.get_ticks() // 600) % 2 == 0:
             p = self.font_small.render("PRESS ENTER TO CONTINUE", True, self.TEXT_DIM)
-            r = p.get_rect(center=(BASE_WIDTH // 2, 400))
+            r = p.get_rect(center=(BASE_WIDTH // 2, 440))
             surf.blit(p, r)
 
     # -------------------------------------------------------------------
