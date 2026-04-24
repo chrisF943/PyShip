@@ -89,3 +89,5 @@ main.py        — Entry point
 1. **Deploy** — Select a ship (1=Carrier, 2=Battleship, 3=Cruiser, 4=Submarine, 5=Destroyer). Use the **Arrow Keys** to position the placement preview on your grid, **R** to rotate, and **Enter** to deploy. You must deploy all 5 unique ships.
 2. **Battle** — Use the **Arrow Keys** (or A-J/1-0 shortcuts) to move the targeting cursor on the enemy grid, then press **Enter** to fire.
 3. **Sink** — The *Enemy Ships* panel tracks your opponent's fleet. Sink all 5 ships before they sink yours!
+
+*Developed on Python 3.14.3*
